@@ -161,6 +161,9 @@ int wsio_send(CONCRETE_IO_HANDLE ws_io, const void* buffer, size_t size, ON_SEND
 
 **SRS_WSIO_01_105: [** The argument `on_send_complete` shall be optional, if NULL is passed by the caller then no send complete callback shall be triggered. **]**
 
+**SRS_WSIO_09_001: [** If `uws_client_send_frame_async` fails and (only if) the message is still queued, it shall be de-queued and destroyed. **]**  
+
+
 ###  wsio_dowork
 
 ```c

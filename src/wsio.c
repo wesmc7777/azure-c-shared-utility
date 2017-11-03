@@ -552,6 +552,11 @@ int wsio_close(CONCRETE_IO_HANDLE ws_io, ON_IO_CLOSE_COMPLETE on_io_close_comple
     return result;
 }
 
+static bool find_list_node(LIST_ITEM_HANDLE list_item, const void* match_context)
+{
+    return list_item == (LIST_ITEM_HANDLE)match_context;
+}
+
 int wsio_send(CONCRETE_IO_HANDLE ws_io, const void* buffer, size_t size, ON_SEND_COMPLETE on_send_complete, void* callback_context)
 {
     int result;
@@ -606,12 +611,18 @@ int wsio_send(CONCRETE_IO_HANDLE ws_io, const void* buffer, size_t size, ON_SEND
                     /* Codes_SRS_WSIO_01_096: [ The frame type used shall be `WS_FRAME_TYPE_BINARY`. ]*/
                     if (uws_client_send_frame_async(wsio_instance->uws, WS_FRAME_TYPE_BINARY, (const unsigned char*)buffer, size, true, on_underlying_ws_send_frame_complete, new_item) != 0)
                     {
-                        if (singlylinkedlist_remove(wsio_instance->pending_io_list, new_item) != 0)
+                        // Codes_SRS_WSIO_09_001: [ If `uws_client_send_frame_async` fails and (only if) the message is still queued, it shall be de-queued and destroyed. ]
+                        if (singlylinkedlist_find(wsio_instance->pending_io_list, find_list_node, new_item) != NULL)
                         {
-                            LogError("Failed removing pending IO from linked list.");
+                            // Guards against double free in case the underlying I/O invoked 'on_underlying_ws_send_frame_complete' within uws_client_send_frame_async.
+                            if (singlylinkedlist_remove(wsio_instance->pending_io_list, new_item) != 0)
+                            {
+                                LogError("Failed removing pending IO from linked list.");
+                            }
+
+                            free(pending_socket_io);
                         }
 
-                        free(pending_socket_io);
                         result = __FAILURE__;
                     }
                     else

@@ -297,6 +297,7 @@ TEST_SUITE_INITIALIZE(suite_init)
 
     REGISTER_UMOCK_ALIAS_TYPE(SINGLYLINKEDLIST_HANDLE, void*);
     REGISTER_UMOCK_ALIAS_TYPE(LIST_ITEM_HANDLE, void*);
+    REGISTER_UMOCK_ALIAS_TYPE(LIST_MATCH_FUNCTION, void*);
     REGISTER_UMOCK_ALIAS_TYPE(XIO_HANDLE, void*);
     REGISTER_UMOCK_ALIAS_TYPE(UWS_CLIENT_HANDLE, void*);
     REGISTER_UMOCK_ALIAS_TYPE(ON_WS_OPEN_COMPLETE, void*);
@@ -1055,6 +1056,70 @@ TEST_FUNCTION(wsio_send_with_1_byte_calls_uws_send_frame)
 
     // assert
     ASSERT_ARE_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    wsio_get_interface_description()->concrete_io_destroy(wsio);
+}
+
+// Tests_SRS_WSIO_09_001: [ If `uws_client_send_frame_async` fails and (only if) the message is still queued, it shall be de-queued and destroyed. ]
+TEST_FUNCTION(uws_client_send_frame_async_fails_does_NOT_call_on_send_complete)
+{
+    // arrange
+    CONCRETE_IO_HANDLE wsio;
+    int result;
+    unsigned char test_buffer[] = { 42 };
+
+    wsio = wsio_get_interface_description()->concrete_io_create(&default_wsio_config);
+    (void)wsio_get_interface_description()->concrete_io_open(wsio, test_on_io_open_complete, (void*)0x4242, test_on_bytes_received, (void*)0x4243, test_on_io_error, (void*)0x4244);
+    g_on_ws_open_complete(g_on_ws_open_complete_context, WS_OPEN_OK);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(singlylinkedlist_add(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(uws_client_send_frame_async(TEST_UWS_HANDLE, WS_FRAME_TYPE_BINARY, IGNORED_PTR_ARG, sizeof(test_buffer), true, IGNORED_PTR_ARG, IGNORED_PTR_ARG))
+        .SetReturn(1);
+    STRICT_EXPECTED_CALL(singlylinkedlist_find(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_PTR_ARG, IGNORED_PTR_ARG))
+        .SetReturn(TEST_LIST_ITEM_HANDLE);
+    STRICT_EXPECTED_CALL(singlylinkedlist_remove(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(free(IGNORED_PTR_ARG));
+
+    // act
+    result = wsio_get_interface_description()->concrete_io_send(wsio, test_buffer, sizeof(test_buffer), test_on_send_complete, (void*)0x4343);
+
+    // assert
+    ASSERT_ARE_NOT_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    wsio_get_interface_description()->concrete_io_destroy(wsio);
+}
+
+// Tests_SRS_WSIO_09_001: [ If `uws_client_send_frame_async` fails and (only if) the message is still queued, it shall be de-queued and destroyed. ]
+TEST_FUNCTION(uws_client_send_frame_async_fails_DOES_call_on_send_complete)
+{
+    // arrange
+    CONCRETE_IO_HANDLE wsio;
+    int result;
+    unsigned char test_buffer[] = { 42 };
+
+    wsio = wsio_get_interface_description()->concrete_io_create(&default_wsio_config);
+    (void)wsio_get_interface_description()->concrete_io_open(wsio, test_on_io_open_complete, (void*)0x4242, test_on_bytes_received, (void*)0x4243, test_on_io_error, (void*)0x4244);
+    g_on_ws_open_complete(g_on_ws_open_complete_context, WS_OPEN_OK);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(singlylinkedlist_add(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(uws_client_send_frame_async(TEST_UWS_HANDLE, WS_FRAME_TYPE_BINARY, IGNORED_PTR_ARG, sizeof(test_buffer), true, IGNORED_PTR_ARG, IGNORED_PTR_ARG))
+        .SetReturn(1);
+    STRICT_EXPECTED_CALL(singlylinkedlist_find(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_PTR_ARG, IGNORED_PTR_ARG))
+        .SetReturn(NULL);
+
+    // act
+    result = wsio_get_interface_description()->concrete_io_send(wsio, test_buffer, sizeof(test_buffer), test_on_send_complete, (void*)0x4343);
+
+    // assert
+    ASSERT_ARE_NOT_EQUAL(int, 0, result);
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 
     // cleanup
