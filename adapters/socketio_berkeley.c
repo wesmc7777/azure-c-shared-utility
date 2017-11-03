@@ -34,6 +34,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
+#include "azure_c_shared_utility/crt_abstractions.h"
 #include "azure_c_shared_utility/singlylinkedlist.h"
 #include "azure_c_shared_utility/gballoc.h"
 #include "azure_c_shared_utility/optimize_size.h"
@@ -101,33 +102,38 @@ static void* socketio_CloneOption(const char* name, const void* value)
 {
     void* result;
 
-    if (name != NULL)
+    if (name == NULL)
     {
+        LogError("Failed cloning option (name is NULL)");
         result = NULL;
-
+    }
+    else
+    {
         if (strcmp(name, OPTION_NET_INT_MAC_ADDRESS) == 0)
         {
             if (value == NULL)
             {
                 LogError("Failed cloning option %s (value is NULL)", name);
+                result = NULL;
             }
             else
             {
-                if ((result = malloc(sizeof(char) * (strlen((char*)value) + 1))) == NULL)
+                char* value_clone;
+                if (mallocAndStrcpy_s(&value_clone, value) != 0)
                 {
                     LogError("Failed cloning option %s (malloc failed)", name);
-                }
-                else if (strcpy((char*)result, (char*)value) == NULL)
-                {
-                    LogError("Failed cloning option %s (strcpy failed)", name);
-                    free(result);
                     result = NULL;
+                }
+                else
+                {
+                    result = value_clone;
                 }
             }
         }
         else
         {
             LogError("Cannot clone option %s (not suppported)", name);
+            result = NULL;
         }
     }
 
@@ -236,11 +242,6 @@ static int add_pending_io(SOCKET_IO_INSTANCE* socket_io_instance, const unsigned
     }
 
     return result;
-}
-
-static void signal_callback(int signum)
-{
-    LogError("Socket received signal %d.", signum);
 }
 
 #ifndef __APPLE__
@@ -797,7 +798,7 @@ int socketio_send(CONCRETE_IO_HANDLE socket_io, const void* buffer, size_t size,
             }
             else
             {
-                signal(SIGPIPE, signal_callback);
+                signal(SIGPIPE, SIG_IGN);
 
                 int send_result = send(socket_io_instance->socket, buffer, size, 0);
                 if (send_result != size)
@@ -862,6 +863,8 @@ void socketio_dowork(CONCRETE_IO_HANDLE socket_io)
                 LogError("Failure: retrieving socket from list");
                 break;
             }
+
+            signal(SIGPIPE, SIG_IGN);
 
             int send_result = send(socket_io_instance->socket, pending_socket_io->bytes, pending_socket_io->size, 0);
             if (send_result != pending_socket_io->size)
