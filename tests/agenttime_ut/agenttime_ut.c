@@ -19,24 +19,6 @@ time_t my_time64(time_t * _Time)
     return (int64_t)-1;
 }
 
-struct tm* my_gmtime64(time_t* _Time)
-{
-    (void)_Time;
-    return NULL;
-}
-
-struct tm* my_localtime64(time_t * _Time)
-{
-    (void)_Time;
-    return NULL;
-}
-
-time_t my_mktime64(struct tm* _Time)
-{
-    (void)_Time;
-    return (int64_t)-1;
-}
-
 BEGIN_TEST_SUITE(agenttime_unittests)
 
         TEST_SUITE_INITIALIZE(TestClassInitialize)
@@ -74,18 +56,6 @@ BEGIN_TEST_SUITE(agenttime_unittests)
 
             ///assert
             ASSERT_ARE_EQUAL(int, (int)result, (int)t);
-        }
-
-        TEST_FUNCTION(get_gmtime_success)
-        {
-            ///act
-            time_t now;
-            struct tm* p;
-            now = get_time(NULL);
-            p = get_gmtime(&now);
-
-            ///assert
-            ASSERT_IS_NOT_NULL(p);
         }
 
         TEST_FUNCTION(get_difftime_success)

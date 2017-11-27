@@ -203,10 +203,7 @@ EXPORTS
     gballoc_init
     gballoc_malloc
     gballoc_realloc
-    get_ctime
     get_difftime
-    get_gmtime
-    get_mktime
     get_time
     global_log_function
     hmac

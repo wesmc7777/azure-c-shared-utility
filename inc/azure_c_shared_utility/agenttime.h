@@ -22,31 +22,13 @@ extern "C"
 
 /** @brief Get current calendar time.
 *
-*	@details This function provides the same functionality as the
-*	standard C @c time() function.
+*	@details This function provides nearly the same functionality as the
+*	standard C @c time() function. The difference is that this function
+*   is required to return epoch time in seconds. Nearly all implementations
+*   do this, but the C standard does not require it.
 */
 MOCKABLE_FUNCTION(, time_t, get_time, time_t*, currentTime);
 
-/** @brief Get UTC in @c tm struct.
-*
-*	@details This function provides the same functionality as the
-*	standard C @c gmtime() function.
-*/
-MOCKABLE_FUNCTION(, struct tm*, get_gmtime, time_t*, currentTime);
-
-/** @brief Get current time representation of the given calendar time.
-*
-*	@details This function provides the same functionality as the
-*	standard C @c mktime() function.
-*/
-MOCKABLE_FUNCTION(, time_t, get_mktime, struct tm*, cal_time);
-
-/** @brief Gets a C-string representation of the given time.
-*
-*	@details This function provides the same functionality as the
-*	standard C @c ctime() function.
-*/
-MOCKABLE_FUNCTION(, char*, get_ctime, time_t*, timeToGet);
 
 /** @brief Gets the difference in seconds between @c stopTime and
 *	@c startTime.
