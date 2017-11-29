@@ -96,6 +96,71 @@ typedef struct NETWORK_INTERFACE_DESCRIPTION_TAG
     struct NETWORK_INTERFACE_DESCRIPTION_TAG* next;
 } NETWORK_INTERFACE_DESCRIPTION;
 
+static ssize_t send_detour(int sockfd, const void *buf, size_t len, int flags)
+{
+    size_t result;
+    FILE* file;
+    bool fail_send = false;
+    bool stop_sending = false;
+
+    file = fopen("./failsocketsend", "r");
+    if (file != NULL)
+    {
+        fail_send = true;
+        fclose(file);
+    }
+
+    file = fopen("./stopsending", "r");
+    if (file != NULL)
+    {
+        stop_sending = true;
+        fclose(file);
+    }
+
+    if (fail_send)
+    {
+        result = INVALID_SOCKET;
+        errno = 107;
+        raise(SIGPIPE);
+    }
+    else if (stop_sending)
+    {
+        result = 0;
+    }
+    else
+    {
+        result = send(sockfd, buf, len, flags);
+    }
+
+    return result;
+}
+
+static ssize_t recv_detour(int sockfd, void *buf, size_t len, int flags)
+{
+    size_t result;
+
+    FILE* file;
+    bool stop_receiving = false;
+
+    file = fopen("./stopreceiving", "r");
+    if (file != NULL)
+    {
+        stop_receiving = true;
+        fclose(file);
+    }
+
+    if (stop_receiving)
+    {
+        result = 0;
+    }
+    else
+    {
+        result = recv(sockfd, buf, len, flags);
+    }
+
+    return result;
+}
+
 /*this function will clone an option given by name and value*/
 static void* socketio_CloneOption(const char* name, const void* value)
 {
@@ -799,7 +864,7 @@ int socketio_send(CONCRETE_IO_HANDLE socket_io, const void* buffer, size_t size,
             {
                 signal(SIGPIPE, SIG_IGN);
 
-                int send_result = send(socket_io_instance->socket, buffer, size, 0);
+                int send_result = send_detour(socket_io_instance->socket, buffer, size, 0);
                 if (send_result != size)
                 {
                     if (send_result == INVALID_SOCKET)
@@ -864,7 +929,7 @@ void socketio_dowork(CONCRETE_IO_HANDLE socket_io)
 
             signal(SIGPIPE, SIG_IGN);
 
-            int send_result = send(socket_io_instance->socket, pending_socket_io->bytes, pending_socket_io->size, 0);
+            int send_result = send_detour(socket_io_instance->socket, pending_socket_io->bytes, pending_socket_io->size, 0);
             if (send_result != pending_socket_io->size)
             {
                 if (send_result == INVALID_SOCKET)
@@ -918,7 +983,7 @@ void socketio_dowork(CONCRETE_IO_HANDLE socket_io)
             int received = 0;
             do
             {
-                received = recv(socket_io_instance->socket, socket_io_instance->recv_bytes, RECEIVE_BYTES_VALUE, 0);
+                received = recv_detour(socket_io_instance->socket, socket_io_instance->recv_bytes, RECEIVE_BYTES_VALUE, 0);
                 if (received > 0)
                 {
                     if (socket_io_instance->on_bytes_received != NULL)
