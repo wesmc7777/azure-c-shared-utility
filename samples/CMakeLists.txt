@@ -11,7 +11,9 @@ function(add_sample_directory whatIsBuilding)
                FOLDER "C-Utility_Samples")
 endfunction()
 
-add_sample_directory(iot_c_utility)
+if ($use_http)
+    add_sample_directory(iot_c_utility)
+endif()
 
 if (NOT ("${ARCHITECTURE}" STREQUAL "ARM"))
     add_sample_directory(socketio_connect)
