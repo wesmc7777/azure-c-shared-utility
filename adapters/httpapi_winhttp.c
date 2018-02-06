@@ -130,7 +130,7 @@ HTTPAPI_RESULT HTTPAPI_Init(void)
     {
         if ((g_SessionHandle = WinHttpOpen(
             NULL,
-#if defined _MSC_VER && _MSC_VER < 1600
+#if defined WINVER && WINVER < 0x0602
             WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
 #else
             WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
