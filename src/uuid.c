@@ -14,7 +14,7 @@
 #define __SUCCESS__                 0
 #define UUID_FORMAT_STRING          "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x"
 
-int UUID_from_string(const char* uuid_string, UUID* uuid)
+int UUID_from_string(const char* uuid_string, UUID_T* uuid)
 {
     int result;
 
@@ -75,7 +75,7 @@ int UUID_from_string(const char* uuid_string, UUID* uuid)
     return result;
 }
 
-char* UUID_to_string(UUID* uuid)
+char* UUID_to_string(UUID_T* uuid)
 {
     char* result;
 
@@ -119,7 +119,7 @@ char* UUID_to_string(UUID* uuid)
     return result;
 }
 
-int UUID_generate(UUID* uuid)
+int UUID_generate(UUID_T* uuid)
 {
     int result;
 
