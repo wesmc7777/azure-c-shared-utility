@@ -4,6 +4,8 @@
 #ifndef OPTION_STORE_H
 #define OPTION_STORE_H
 
+#include "azure_c_shared_utility/xio.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
@@ -21,6 +23,21 @@ typedef struct OPTION_STORE_TAG
 } OPTION_STORE;
 
 void option_store_safe_invoke_delete(OPTION_STORE* store);
+
+// A function that knows how to set a particular option
+typedef int(*pfOptionStoreSetter)(void* handle, const void* value);
+
+// A pairing of an option name and a function that sets the option
+typedef struct OPTION_STORE_NAME_AND_SETTER_PAIR_TAG
+{
+    const char* const* name;
+    pfOptionStoreSetter setter;
+} OPTION_STORE_NAME_AND_SETTER_PAIR;
+
+#define OPTION_STORE_PAIRS_COUNT  (sizeof(option_store_setters) / sizeof(OPTION_STORE_NAME_AND_SETTER_PAIR))
+
+int option_store_set_option(CONCRETE_IO_HANDLE xio, const char* name, const void* value, CONCRETE_IO_HANDLE downstream_xio,
+    OPTION_STORE_NAME_AND_SETTER_PAIR* pairs, size_t pair_count);
 
 #ifdef __cplusplus
 }

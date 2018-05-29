@@ -97,12 +97,6 @@ typedef struct TLS_IO_INSTANCE_TAG
     BIO* in_bio;
     BIO* out_bio;
     TLSIO_STATE tlsio_state;
-    char* certificate;
-    const char* x509_certificate;
-    const char* x509_private_key;
-    TLSIO_VERSION tls_version;
-    TLS_CERTIFICATE_VALIDATION_CALLBACK tls_validation_callback;
-    void* tls_validation_callback_data;
     // The options_data pointer is owned by the caller of tlsio_create
     TLS_IO_OPTIONS_DATA* options_data;
 } TLS_IO_INSTANCE;
@@ -133,115 +127,6 @@ static void* tlsio_openssl_CloneOption(const char* name, const void* value)
         {
             result = (void*)value;
         }
-        else if (strcmp(name, OPTION_TRUSTED_CERT) == 0)
-        {
-            if (mallocAndStrcpy_s((char**)&result, value) != 0)
-            {
-                LogError("unable to mallocAndStrcpy_s TrustedCerts value");
-                result = NULL;
-            }
-            else
-            {
-                /*return as is*/
-            }
-        }
-        else if (strcmp(name, SU_OPTION_X509_CERT) == 0)
-        {
-            if (mallocAndStrcpy_s((char**)&result, value) != 0)
-            {
-                LogError("unable to mallocAndStrcpy_s x509certificate value");
-                result = NULL;
-            }
-            else
-            {
-                /*return as is*/
-            }
-        }
-        else if (strcmp(name, SU_OPTION_X509_PRIVATE_KEY) == 0)
-        {
-            if (mallocAndStrcpy_s((char**)&result, value) != 0)
-            {
-                LogError("unable to mallocAndStrcpy_s x509privatekey value");
-                result = NULL;
-            }
-            else
-            {
-                /*return as is*/
-            }
-        }
-        else if (strcmp(name, OPTION_X509_ECC_CERT) == 0)
-        {
-            if (mallocAndStrcpy_s((char**)&result, value) != 0)
-            {
-                LogError("unable to mallocAndStrcpy_s x509EccCertificate value");
-                result = NULL;
-            }
-            else
-            {
-                /*return as is*/
-            }
-        }
-        else if (strcmp(name, OPTION_X509_ECC_KEY) == 0)
-        {
-            if (mallocAndStrcpy_s((char**)&result, value) != 0)
-            {
-                LogError("unable to mallocAndStrcpy_s x509EccKey value");
-                result = NULL;
-            }
-            else
-            {
-                /*return as is*/
-            }
-        }
-        else if (strcmp(name, OPTION_TLS_VERSION) == 0)
-        {
-            int int_value;
-            
-            if (*(TLSIO_VERSION*)value == VERSION_1_0)
-            {
-                int_value = 10;
-            }
-            else if (*(TLSIO_VERSION*)value == VERSION_1_1)
-            {
-                int_value = 11;
-            }
-            else if (*(TLSIO_VERSION*)value == VERSION_1_2)
-            {
-                int_value = 12;
-            }
-            else
-            {
-                LogError("Unexpected TLS version value (%d)", *(int*)value);
-                int_value = -1;
-            }
-            
-            if (int_value < 0)
-            {
-                result = NULL;
-            }
-            else
-            {
-                int* value_clone;
-
-                if ((value_clone = (int*)malloc(sizeof(int))) == NULL)
-                {
-                    LogError("Failed clonning tls_version option");
-                }
-                else
-                {
-                    *value_clone = int_value;
-                }
-                
-                result = value_clone;
-            }
-        }
-        else if (
-            (strcmp(name, "tls_validation_callback") == 0) ||
-            (strcmp(name, "tls_validation_callback_data") == 0)
-            )
-        {
-            result = (void*)value;
-        }
         else
         {
             LogError("not handled option : %s", name);
@@ -260,35 +145,6 @@ static void tlsio_openssl_DestroyOption(const char* name, const void* value)
         )
     {
         LogError("invalid parameter detected: const char* name=%p, const void* value=%p", name, value);
-    }
-    else
-    {
-        if (
-            (strcmp(name, OPTION_TRUSTED_CERT) == 0) ||
-            (strcmp(name, SU_OPTION_X509_CERT) == 0) ||
-            (strcmp(name, SU_OPTION_X509_PRIVATE_KEY) == 0) ||
-            (strcmp(name, OPTION_X509_ECC_CERT) == 0) ||
-            (strcmp(name, OPTION_X509_ECC_KEY) == 0) ||
-            (strcmp(name, OPTION_TLS_VERSION) == 0)
-            )
-        {
-            free((void*)value);
-        }
-        else if (
-            (strcmp(name, "tls_validation_callback") == 0) ||
-            (strcmp(name, "tls_validation_callback_data") == 0)
-            )
-        {
-            // nothing to free.
-        }
-        else if (strcmp(name, OPTION_UNDERLYING_IO_OPTIONS) == 0)
-        {
-            OptionHandler_Destroy((OPTIONHANDLER_HANDLE)value);
-        }
-        else
-        {
-            LogError("not handled option : %s", name);
-        }
     }
 }
 
@@ -321,60 +177,6 @@ static OPTIONHANDLER_HANDLE tlsio_openssl_retrieveoptions(CONCRETE_IO_HANDLE han
                 OptionHandler_Destroy(underlying_io_options);
                 OptionHandler_Destroy(result);
                 result = NULL;
-            }
-            else if (
-                (tls_io_instance->certificate != NULL) &&
-                (OptionHandler_AddOption(result, OPTION_TRUSTED_CERT, tls_io_instance->certificate) != OPTIONHANDLER_OK)
-                )
-            {
-                LogError("unable to save TrustedCerts option");
-                OptionHandler_Destroy(result);
-                result = NULL;
-            }
-            else if (tls_io_instance->x509_certificate != NULL && (OptionHandler_AddOption(result, SU_OPTION_X509_CERT, tls_io_instance->x509_certificate) != OPTIONHANDLER_OK) )
-            {
-                LogError("unable to save x509 certificate option");
-                OptionHandler_Destroy(result);
-                result = NULL;
-            }
-            else if (tls_io_instance->x509_private_key != NULL && (OptionHandler_AddOption(result, SU_OPTION_X509_PRIVATE_KEY, tls_io_instance->x509_private_key) != OPTIONHANDLER_OK) )
-            {
-                LogError("unable to save x509 privatekey option");
-                OptionHandler_Destroy(result);
-                result = NULL;
-            }
-            else if (tls_io_instance->tls_version != 0)
-            {
-                if (OptionHandler_AddOption(result, OPTION_TLS_VERSION, &tls_io_instance->tls_version) != OPTIONHANDLER_OK)
-                {
-                    LogError("unable to save tls_version option");
-                    OptionHandler_Destroy(result);
-                    result = NULL;
-                }
-            }
-            else if (tls_io_instance->tls_validation_callback != NULL)
-            {
-#ifdef WIN32
-#pragma warning(push)
-#pragma warning(disable:4152)
-#endif
-                void* ptr = tls_io_instance->tls_validation_callback;
-#ifdef WIN32
-#pragma warning(pop)
-#endif
-                if (OptionHandler_AddOption(result, "tls_validation_callback", (const char*)ptr) != OPTIONHANDLER_OK)
-                {
-                    LogError("unable to save tls_validation_callback option");
-                    OptionHandler_Destroy(result);
-                    result = NULL;
-                }
-
-                if (OptionHandler_AddOption(result, "tls_validation_callback_data", (const char*)tls_io_instance->tls_validation_callback_data) != OPTIONHANDLER_OK)
-                {
-                    LogError("unable to save tls_validation_callback_data option");
-                    OptionHandler_Destroy(result);
-                    result = NULL;
-                }
             }
             else
             {
@@ -935,11 +737,11 @@ static int create_openssl_instance(TLS_IO_INSTANCE* tlsInstance)
     const SSL_METHOD* method = NULL;
 
 #if (OPENSSL_VERSION_NUMBER < 0x10100000L) || (OPENSSL_VERSION_NUMBER >= 0x20000000L)
-    if (tlsInstance->tls_version == VERSION_1_2)
+    if (tlsInstance->options_data->tls_version == VERSION_1_2)
     {
         method = TLSv1_2_method();
     }
-    else if (tlsInstance->tls_version == VERSION_1_1)
+    else if (tlsInstance->options_data->tls_version == VERSION_1_1)
     {
         method = TLSv1_1_method();
     }
@@ -959,7 +761,7 @@ static int create_openssl_instance(TLS_IO_INSTANCE* tlsInstance)
         log_ERR_get_error("Failed allocating OpenSSL context.");
         result = __FAILURE__;
     }
-    else if (add_certificate_to_store(tlsInstance, tlsInstance->certificate) != 0)
+    else if (add_certificate_to_store(tlsInstance, tlsInstance->options_data->certificate) != 0)
     {
         SSL_CTX_free(tlsInstance->ssl_context);
         tlsInstance->ssl_context = NULL;
@@ -968,9 +770,9 @@ static int create_openssl_instance(TLS_IO_INSTANCE* tlsInstance)
     }
     /*x509 authentication can only be build before underlying connection is realized*/
     else if (
-        (tlsInstance->x509_certificate != NULL) &&
-        (tlsInstance->x509_private_key != NULL) &&
-        (x509_openssl_add_credentials(tlsInstance->ssl_context, tlsInstance->x509_certificate, tlsInstance->x509_private_key) != 0)
+        (tlsInstance->options_data->x509_certificate != NULL) &&
+        (tlsInstance->options_data->x509_private_key != NULL) &&
+        (x509_openssl_add_credentials(tlsInstance->ssl_context, tlsInstance->options_data->x509_certificate, tlsInstance->options_data->x509_private_key) != 0)
         )
     {
         SSL_CTX_free(tlsInstance->ssl_context);
@@ -980,7 +782,7 @@ static int create_openssl_instance(TLS_IO_INSTANCE* tlsInstance)
     }
     else
     {
-        SSL_CTX_set_cert_verify_callback(tlsInstance->ssl_context, tlsInstance->tls_validation_callback, tlsInstance->tls_validation_callback_data);
+        SSL_CTX_set_cert_verify_callback(tlsInstance->ssl_context, tlsInstance->options_data->tls_validation_callback, tlsInstance->options_data->tls_validation_callback_data);
 
         tlsInstance->in_bio = BIO_new(BIO_s_mem());
         if (tlsInstance->in_bio == NULL)
@@ -1113,6 +915,8 @@ static bool validate_or_initialize_options_data(OPTION_STORE* store)
         }
         else
         {
+            // The default tls_version = VERSION_1_0 is 0. If it were
+            // any other value, we would need to set it here.
             memset(store->option_data, 0, sizeof(TLS_IO_OPTIONS_DATA));
             store->delete_option_data = delete_local_options_data;
             result = true;
@@ -1179,7 +983,6 @@ CONCRETE_IO_HANDLE tlsio_openssl_create(void* io_create_parameters)
             }
             else
             {
-                result->certificate = NULL;
                 result->in_bio = NULL;
                 result->out_bio = NULL;
                 result->on_bytes_received = NULL;
@@ -1192,12 +995,6 @@ CONCRETE_IO_HANDLE tlsio_openssl_create(void* io_create_parameters)
                 result->on_io_error_context = NULL;
                 result->ssl = NULL;
                 result->ssl_context = NULL;
-                result->tls_validation_callback = NULL;
-                result->tls_validation_callback_data = NULL;
-                result->x509_certificate = NULL;
-                result->x509_private_key = NULL;
-
-                result->tls_version = VERSION_1_0;
 
                 result->underlying_io = xio_create(underlying_io_interface, io_interface_parameters);
                 if (result->underlying_io == NULL)
@@ -1226,13 +1023,6 @@ void tlsio_openssl_destroy(CONCRETE_IO_HANDLE tls_io)
     else
     {
         TLS_IO_INSTANCE* tls_io_instance = (TLS_IO_INSTANCE*)tls_io;
-        if (tls_io_instance->certificate != NULL)
-        {
-            free(tls_io_instance->certificate);
-            tls_io_instance->certificate = NULL;
-        }
-        free((void*)tls_io_instance->x509_certificate);
-        free((void*)tls_io_instance->x509_private_key);
         close_openssl_instance(tls_io_instance);
         if (tls_io_instance->underlying_io != NULL)
         {
@@ -1464,177 +1254,193 @@ void tlsio_openssl_dowork(CONCRETE_IO_HANDLE tls_io)
     }
 }
 
-int tlsio_openssl_setoption(CONCRETE_IO_HANDLE tls_io, const char* optionName, const void* value)
+static int setoption_trusted_cert(CONCRETE_IO_HANDLE tls_io, const void* value)
 {
+    size_t len;
     int result;
+    TLS_IO_INSTANCE* tls_io_instance = (TLS_IO_INSTANCE*)tls_io;
+    const char* cert = (const char*)value;
 
-    if (tls_io == NULL || optionName == NULL)
+    if (tls_io_instance->options_data->certificate != NULL)
+    {
+        // Free the memory if it has been previously allocated
+        free(tls_io_instance->options_data->certificate);
+    }
+
+    // Store the certificate
+    len = strlen(cert);
+    tls_io_instance->options_data->certificate = malloc(len + 1);
+    if (tls_io_instance->options_data->certificate == NULL)
     {
         result = __FAILURE__;
     }
     else
     {
-        TLS_IO_INSTANCE* tls_io_instance = (TLS_IO_INSTANCE*)tls_io;
+        strcpy(tls_io_instance->options_data->certificate, cert);
+        result = 0;
+    }
 
-        if (strcmp(OPTION_TRUSTED_CERT, optionName) == 0)
+    // If we're previously connected then add the cert to the context
+    if (tls_io_instance->ssl_context != NULL)
+    {
+        result = add_certificate_to_store(tls_io_instance, cert);
+    }
+    return result;
+}
+
+static int setoption_set_x509_cert(CONCRETE_IO_HANDLE tls_io, const void* value)
+{
+    int result;
+    TLS_IO_INSTANCE* tls_io_instance = (TLS_IO_INSTANCE*)tls_io;
+    if (tls_io_instance->options_data->x509_certificate != NULL)
+    {
+        LogError("unable to set x509 options more than once");
+        result = __FAILURE__;
+    }
+    else
+    {
+        /*let's make a copy of this option*/
+        if (mallocAndStrcpy_s((char**)&tls_io_instance->options_data->x509_certificate, value) != 0)
         {
-            const char* cert = (const char*)value;
-            size_t len;
-
-            if (tls_io_instance->certificate != NULL)
-            {
-                // Free the memory if it has been previously allocated
-                free(tls_io_instance->certificate);
-            }
-
-            // Store the certificate
-            len = strlen(cert);
-            tls_io_instance->certificate = malloc(len + 1);
-            if (tls_io_instance->certificate == NULL)
-            {
-                result = __FAILURE__;
-            }
-            else
-            {
-                strcpy(tls_io_instance->certificate, cert);
-                result = 0;
-            }
-
-            // If we're previously connected then add the cert to the context
-            if (tls_io_instance->ssl_context != NULL)
-            {
-                result = add_certificate_to_store(tls_io_instance, cert);
-            }
+            LogError("unable to mallocAndStrcpy_s");
+            result = __FAILURE__;
         }
-        else if (strcmp(SU_OPTION_X509_CERT, optionName) == 0 || strcmp(OPTION_X509_ECC_CERT, optionName) == 0)
+        else
         {
-            if (tls_io_instance->x509_certificate != NULL)
-            {
-                LogError("unable to set x509 options more than once");
-                result = __FAILURE__;
-            }
-            else
-            {
-                /*let's make a copy of this option*/
-                if (mallocAndStrcpy_s((char**)&tls_io_instance->x509_certificate, value) != 0)
-                {
-                    LogError("unable to mallocAndStrcpy_s");
-                    result = __FAILURE__;
-                }
-                else
-                {
-                    result = 0;
-                }
-            }
+            result = 0;
         }
-        else if (strcmp(SU_OPTION_X509_PRIVATE_KEY, optionName) == 0 || strcmp(OPTION_X509_ECC_KEY, optionName) == 0)
+    }
+    return result;
+}
+
+static int setoption_set_x509_key(CONCRETE_IO_HANDLE tls_io, const void* value)
+{
+    int result;
+    TLS_IO_INSTANCE* tls_io_instance = (TLS_IO_INSTANCE*)tls_io;
+    if (tls_io_instance->options_data->x509_private_key != NULL)
+    {
+        LogError("unable to set more than once x509 options");
+        result = __FAILURE__;
+    }
+    else
+    {
+        /*let's make a copy of this option*/
+        if (mallocAndStrcpy_s((char**)&tls_io_instance->options_data->x509_private_key, value) != 0)
         {
-            if (tls_io_instance->x509_private_key != NULL)
-            {
-                LogError("unable to set more than once x509 options");
-                result = __FAILURE__;
-            }
-            else
-            {
-                /*let's make a copy of this option*/
-                if (mallocAndStrcpy_s((char**)&tls_io_instance->x509_private_key, value) != 0)
-                {
-                    LogError("unable to mallocAndStrcpy_s");
-                    result = __FAILURE__;
-                }
-                else
-                {
-                    result = 0;
-                }
-            }
+            LogError("unable to mallocAndStrcpy_s");
+            result = __FAILURE__;
         }
-        else if (strcmp("tls_validation_callback", optionName) == 0)
+        else
         {
+            result = 0;
+        }
+    }
+    return result;
+}
+
+static int setoption_set_tls_validation_callback(CONCRETE_IO_HANDLE tls_io, const void* value)
+{
+    int result;
+    TLS_IO_INSTANCE* tls_io_instance = (TLS_IO_INSTANCE*)tls_io;
 #ifdef WIN32
 #pragma warning(push)
 #pragma warning(disable:4055)
 #endif // WIN32
-            tls_io_instance->tls_validation_callback = (TLS_CERTIFICATE_VALIDATION_CALLBACK)value;
+    tls_io_instance->options_data->tls_validation_callback = (TLS_CERTIFICATE_VALIDATION_CALLBACK)value;
 #ifdef WIN32
 #pragma warning(pop)
 #endif // WIN32
 
-            if (tls_io_instance->ssl_context != NULL)
-            {
-                SSL_CTX_set_cert_verify_callback(tls_io_instance->ssl_context, tls_io_instance->tls_validation_callback, tls_io_instance->tls_validation_callback_data);
-            }
+    if (tls_io_instance->ssl_context != NULL)
+    {
+        SSL_CTX_set_cert_verify_callback(tls_io_instance->ssl_context, tls_io_instance->options_data->tls_validation_callback,
+            tls_io_instance->options_data->tls_validation_callback_data);
+    }
 
-            result = 0;
-        }
-        else if (strcmp("tls_validation_callback_data", optionName) == 0)
-        {
-            tls_io_instance->tls_validation_callback_data = (void*)value;
+    result = 0;
+    return result;
+}
 
-            if (tls_io_instance->ssl_context != NULL)
-            {
-                SSL_CTX_set_cert_verify_callback(tls_io_instance->ssl_context, tls_io_instance->tls_validation_callback, tls_io_instance->tls_validation_callback_data);
-            }
+static int setoption_set_tls_validation_callback_data(CONCRETE_IO_HANDLE tls_io, const void* value)
+{
+    int result;
+    TLS_IO_INSTANCE* tls_io_instance = (TLS_IO_INSTANCE*)tls_io;
+    tls_io_instance->options_data->tls_validation_callback_data = (void*)value;
 
-            result = 0;
-        }
-        else if (strcmp(OPTION_TLS_VERSION, optionName) == 0)
+    if (tls_io_instance->ssl_context != NULL)
+    {
+        SSL_CTX_set_cert_verify_callback(tls_io_instance->ssl_context, tls_io_instance->options_data->tls_validation_callback,
+            tls_io_instance->options_data->tls_validation_callback_data);
+    }
+
+    result = 0;
+    return result;
+}
+
+static int setoption_set_tls_version(CONCRETE_IO_HANDLE tls_io, const void* value)
+{
+    int result;
+    TLS_IO_INSTANCE* tls_io_instance = (TLS_IO_INSTANCE*)tls_io;
+    if (tls_io_instance->ssl_context != NULL)
+    {
+        LogError("Unable to set the tls version after the tls connection is established");
+        result = __FAILURE__;
+    }
+    else
+    {
+        const int version_option = *(const int*)value;
+        if (version_option == 0 || version_option == 10)
         {
-            if (tls_io_instance->ssl_context != NULL)
-            {
-                LogError("Unable to set the tls version after the tls connection is established");
-                result = __FAILURE__;
-            }
-            else
-            {
-                const int version_option = *(const int*)value;
-                if (version_option == 0 || version_option == 10)
-                {
-                    tls_io_instance->tls_version = VERSION_1_0;
-                }
-                else if (version_option == 11)
-                {
-                    tls_io_instance->tls_version = VERSION_1_1;
-                }
-                else if (version_option == 12)
-                {
-                    tls_io_instance->tls_version = VERSION_1_2;
-                }
-                else
-                {
-                    LogInfo("Value of TLS version option %d is not found shall default to version 1.2", version_option);
-                    tls_io_instance->tls_version = VERSION_1_2;
-                }
-                result = 0;
-            }
+            tls_io_instance->options_data->tls_version = VERSION_1_0;
         }
-        else if (strcmp(optionName, OPTION_UNDERLYING_IO_OPTIONS) == 0)
+        else if (version_option == 11)
         {
-            if (OptionHandler_FeedOptions((OPTIONHANDLER_HANDLE)value, (void*)tls_io_instance->underlying_io) != OPTIONHANDLER_OK)
-            {
-                LogError("failed feeding options to underlying I/O instance");
-                result = __FAILURE__;
-            }
-            else
-            {
-                result = 0;
-            }
+            tls_io_instance->options_data->tls_version = VERSION_1_1;
         }
-        else if (strcmp("ignore_server_name_check", optionName) == 0)
+        else if (version_option == 12)
         {
-            result = 0;
+            tls_io_instance->options_data->tls_version = VERSION_1_2;
         }
         else
         {
-            if (tls_io_instance->underlying_io == NULL)
-            {
-                result = __FAILURE__;
-            }
-            else
-            {
-                result = xio_setoption(tls_io_instance->underlying_io, optionName, value);
-            }
+            LogInfo("Value of TLS version option %d is not found shall default to version 1.2", version_option);
+            tls_io_instance->options_data->tls_version = VERSION_1_2;
         }
+        result = 0;
     }
+    return result;
+}
+
+static int setoption_ignore_server_name_check(CONCRETE_IO_HANDLE tls_io, const void* value)
+{
+    (void)tls_io;
+    (void)value;
+    return 0;
+
+}
+
+const char* TLS_VALIDATION_CALLBACK = "tls_validation_callback";
+const char* TLS_VALIDATION_CALLBACk_DATA = "tls_validation_callback_data";
+const char* TLS_IGNORE_SERVER_NAME_CHECK = "ignore_server_name_check";
+
+static OPTION_STORE_NAME_AND_SETTER_PAIR option_store_setters[] =
+{
+    { &OPTION_TRUSTED_CERT, setoption_trusted_cert },
+    { &SU_OPTION_X509_CERT, setoption_set_x509_cert },
+    { &SU_OPTION_X509_PRIVATE_KEY, setoption_set_x509_key },
+    { &TLS_VALIDATION_CALLBACK, setoption_set_tls_validation_callback },
+    { &TLS_VALIDATION_CALLBACk_DATA, setoption_set_tls_validation_callback_data },
+    { &OPTION_TLS_VERSION, setoption_set_tls_version },
+    { &TLS_IGNORE_SERVER_NAME_CHECK, setoption_ignore_server_name_check },
+    { &OPTION_TLS_VERSION, setoption_set_tls_version },
+};
+
+
+int tlsio_openssl_setoption(CONCRETE_IO_HANDLE tls_io, const char* optionName, const void* value)
+{
+    TLS_IO_INSTANCE* tls_io_instance = (TLS_IO_INSTANCE*)tls_io;
+    int result = option_store_set_option(tls_io, optionName, value, tls_io_instance->underlying_io,
+        option_store_setters, OPTION_STORE_PAIRS_COUNT);
 
     return result;
 }
