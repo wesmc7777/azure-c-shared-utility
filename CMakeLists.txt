@@ -175,6 +175,7 @@ ${LOGGING_C_FILE}
 ./src/vector.c
 ${XLOGGING_C_FILE}
 ./src/optionhandler.c
+./src/option_store.c
 ./adapters/agenttime.c
 ${CONDITION_C_FILE}
 ${LOCK_C_FILE}

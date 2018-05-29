@@ -5,6 +5,7 @@
 #define TLSIO_H
 
 #include "xio.h"
+#include "azure_c_shared_utility/option_store.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,6 +17,7 @@ typedef struct TLSIO_CONFIG_TAG
     int port;
     const IO_INTERFACE_DESCRIPTION* underlying_io_interface;
     void* underlying_io_parameters;
+    OPTION_STORE* option_store;
 } TLSIO_CONFIG;
 
 #ifdef __cplusplus

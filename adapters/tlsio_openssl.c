@@ -51,6 +51,36 @@ static bool is_an_opening_state(TLSIO_STATE state)
 
 typedef int(*TLS_CERTIFICATE_VALIDATION_CALLBACK)(X509_STORE_CTX*, void*);
 
+typedef struct TLS_IO_OPTIONS_DATA_TAG
+{
+    char* certificate;
+    bool cert_is_ECC;
+    const char* x509_certificate;
+    const char* x509_private_key;
+    TLSIO_VERSION tls_version;
+    TLS_CERTIFICATE_VALIDATION_CALLBACK tls_validation_callback;
+    void* tls_validation_callback_data;
+    OPTION_STORE socket_options_store;
+} TLS_IO_OPTIONS_DATA;
+
+static void delete_local_options_data(OPTION_STORE_DATA_HANDLE data_in)
+{
+    TLS_IO_OPTIONS_DATA* option_store = (TLS_IO_OPTIONS_DATA*)data_in;
+    if (data_in == NULL)
+    {
+        LogError("NULL parameter");
+    }
+    else
+    {
+        free(option_store->certificate);
+        free((void*)option_store->x509_certificate);
+        free((void*)option_store->x509_private_key);
+        option_store_safe_invoke_delete(&option_store->socket_options_store);
+
+        free(option_store);
+    }
+}
+
 typedef struct TLS_IO_INSTANCE_TAG
 {
     XIO_HANDLE underlying_io;
@@ -73,6 +103,8 @@ typedef struct TLS_IO_INSTANCE_TAG
     TLSIO_VERSION tls_version;
     TLS_CERTIFICATE_VALIDATION_CALLBACK tls_validation_callback;
     void* tls_validation_callback_data;
+    // The options_data pointer is owned by the caller of tlsio_create
+    TLS_IO_OPTIONS_DATA* options_data;
 } TLS_IO_INSTANCE;
 
 struct CRYPTO_dynlock_value
@@ -1056,15 +1088,53 @@ void tlsio_openssl_deinit(void)
     CRYPTO_cleanup_all_ex_data();
 }
 
+static bool validate_or_initialize_options_data(OPTION_STORE* store)
+{
+    bool result;
+    if (store->option_data != NULL)
+    {
+        if (store->delete_option_data == NULL)
+        {
+            LogError("NULL delete_option_data");
+            result = false;
+        }
+        else
+        {
+            result = true;
+        }
+    }
+    else
+    {
+        store->option_data = malloc(sizeof(TLS_IO_OPTIONS_DATA));
+        if (store->option_data == NULL)
+        {
+            LogError("malloc failed");
+            result = false;
+        }
+        else
+        {
+            memset(store->option_data, 0, sizeof(TLS_IO_OPTIONS_DATA));
+            store->delete_option_data = delete_local_options_data;
+            result = true;
+        }
+    }
+    return result;
+}
+
 CONCRETE_IO_HANDLE tlsio_openssl_create(void* io_create_parameters)
 {
     TLSIO_CONFIG* tls_io_config = io_create_parameters;
     TLS_IO_INSTANCE* result;
 
-    if (tls_io_config == NULL)
+    if (tls_io_config == NULL || tls_io_config->option_store == NULL)
     {
         result = NULL;
-        LogError("NULL tls_io_config.");
+        LogError("NULL tls_io_config or option_store.");
+    }
+    else if (!validate_or_initialize_options_data(tls_io_config->option_store))
+    {
+        result = NULL;
+        LogError("bad option store");
     }
     else
     {
@@ -1079,8 +1149,14 @@ CONCRETE_IO_HANDLE tlsio_openssl_create(void* io_create_parameters)
             const IO_INTERFACE_DESCRIPTION* underlying_io_interface;
             void* io_interface_parameters;
 
+            // The options_data is owned by the caller
+            result->options_data = (TLS_IO_OPTIONS_DATA*)tls_io_config->option_store->option_data;
+
             if (tls_io_config->underlying_io_interface != NULL)
             {
+                // TODO: prototype code here; it is assumed that if an underlying
+                // interface is passed in that it will have been provided with
+                // an OPTION_STORE already
                 underlying_io_interface = tls_io_config->underlying_io_interface;
                 io_interface_parameters = tls_io_config->underlying_io_parameters;
             }
@@ -1089,6 +1165,7 @@ CONCRETE_IO_HANDLE tlsio_openssl_create(void* io_create_parameters)
                 socketio_config.hostname = tls_io_config->hostname;
                 socketio_config.port = tls_io_config->port;
                 socketio_config.accepted_socket = NULL;
+                socketio_config.options_store = &result->options_data->socket_options_store;
 
                 underlying_io_interface = socketio_get_interface_description();
                 io_interface_parameters = &socketio_config;
@@ -1162,6 +1239,7 @@ void tlsio_openssl_destroy(CONCRETE_IO_HANDLE tls_io)
             xio_destroy(tls_io_instance->underlying_io);
             tls_io_instance->underlying_io = NULL;
         }
+        // The options_data pointer is owned by the caller of tlsio_create, so not freed here
         free(tls_io);
     }
 }

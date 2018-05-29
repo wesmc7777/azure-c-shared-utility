@@ -7,6 +7,7 @@
 #include "azure_c_shared_utility/xio.h"
 #include "azure_c_shared_utility/xlogging.h"
 #include "azure_c_shared_utility/umock_c_prod.h"
+#include "azure_c_shared_utility/option_store.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -20,6 +21,7 @@ typedef struct SOCKETIO_CONFIG_TAG
     const char* hostname;
     int port;
     void* accepted_socket;
+    OPTION_STORE* options_store;
 } SOCKETIO_CONFIG;
 
 #define RECEIVE_BYTES_VALUE     64
