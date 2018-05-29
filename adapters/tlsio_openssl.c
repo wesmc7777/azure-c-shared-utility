@@ -106,85 +106,13 @@ struct CRYPTO_dynlock_value
     LOCK_HANDLE lock;
 };
 
-static const char* const OPTION_UNDERLYING_IO_OPTIONS = "underlying_io_options";
 #define SSL_DO_HANDSHAKE_SUCCESS 1
 
-
-/*this function will clone an option given by name and value*/
-static void* tlsio_openssl_CloneOption(const char* name, const void* value)
-{
-    void* result;
-    if (
-        (name == NULL) || (value == NULL)
-        )
-    {
-        LogError("invalid parameter detected: const char* name=%p, const void* value=%p", name, value);
-        result = NULL;
-    }
-    else
-    {
-        if (strcmp(name, OPTION_UNDERLYING_IO_OPTIONS) == 0)
-        {
-            result = (void*)value;
-        }
-        else
-        {
-            LogError("not handled option : %s", name);
-            result = NULL;
-        }
-    }
-    return result;
-}
-
-/*this function destroys an option previously created*/
-static void tlsio_openssl_DestroyOption(const char* name, const void* value)
-{
-    /*since all options for this layer are actually string copies., disposing of one is just calling free*/
-    if (
-        (name == NULL) || (value == NULL)
-        )
-    {
-        LogError("invalid parameter detected: const char* name=%p, const void* value=%p", name, value);
-    }
-}
-
+// TODO: this function can eventually go away
 static OPTIONHANDLER_HANDLE tlsio_openssl_retrieveoptions(CONCRETE_IO_HANDLE handle)
 {
-    OPTIONHANDLER_HANDLE result;
-    if (handle == NULL)
-    {
-        LogError("invalid parameter detected: CONCRETE_IO_HANDLE handle=%p", handle);
-        result = NULL;
-    }
-    else
-    {
-        result = OptionHandler_Create(tlsio_openssl_CloneOption, tlsio_openssl_DestroyOption, tlsio_openssl_setoption);
-        if (result == NULL)
-        {
-            LogError("unable to OptionHandler_Create");
-            /*return as is*/
-        }
-        else
-        {
-            /*this layer cares about the certificates and the x509 credentials*/
-            TLS_IO_INSTANCE* tls_io_instance = (TLS_IO_INSTANCE*)handle;
-            OPTIONHANDLER_HANDLE underlying_io_options;
-
-            if ((underlying_io_options = xio_retrieveoptions(tls_io_instance->underlying_io)) == NULL ||
-                OptionHandler_AddOption(result, OPTION_UNDERLYING_IO_OPTIONS, underlying_io_options) != OPTIONHANDLER_OK)
-            {
-                LogError("unable to save underlying_io options");
-                OptionHandler_Destroy(underlying_io_options);
-                OptionHandler_Destroy(result);
-                result = NULL;
-            }
-            else
-            {
-                /*all is fine, all interesting options have been saved*/
-                /*return as is*/
-            }
-        }
-    }
+    (void)handle;
+    OPTIONHANDLER_HANDLE result = option_store_get_empty_option_handler();
     return result;
 }
 

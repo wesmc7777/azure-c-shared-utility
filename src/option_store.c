@@ -53,6 +53,11 @@ int option_store_set_option(CONCRETE_IO_HANDLE xio, const char* optionName, void
         {
             result = pairs[i].setter(xio, value);
         }
+        //else if (strcmp(*pairs[i].name, optionName) == 0)
+        //{
+        //    // Just ignore option 
+        //    result = 0;
+        //}
         else if (downstream_xio == NULL)
         {
             result = __FAILURE__;
@@ -64,6 +69,38 @@ int option_store_set_option(CONCRETE_IO_HANDLE xio, const char* optionName, void
         }
     }
 
+    return result;
+}
+
+/*this function will clone an option given by name and value*/
+static void* cloneOption(const char* name, const void* value)
+{
+    (void)name;
+    (void)value;
+    void* result = NULL;
+    return result;
+}
+
+/*this function destroys an option previously created*/
+static void destroyOption(const char* name, const void* value)
+{
+    (void)name;
+    (void)value;
+}
+
+static int setoption(CONCRETE_IO_HANDLE tls_io, const char* name, const void* value)
+{
+    (void)tls_io;
+    (void)name;
+    (void)value;
+    return 0;
+}
+
+// TODO: Remove this function when optionhandler goes away
+OPTIONHANDLER_HANDLE option_store_get_empty_option_handler(CONCRETE_IO_HANDLE handle)
+{
+    (void)handle;
+    OPTIONHANDLER_HANDLE result = OptionHandler_Create(cloneOption, destroyOption, setoption);
     return result;
 }
 

@@ -5,6 +5,7 @@
 #define OPTION_STORE_H
 
 #include "azure_c_shared_utility/xio.h"
+#include "azure_c_shared_utility/optionhandler.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,8 +37,12 @@ typedef struct OPTION_STORE_NAME_AND_SETTER_PAIR_TAG
 
 #define OPTION_STORE_PAIRS_COUNT  (sizeof(option_store_setters) / sizeof(OPTION_STORE_NAME_AND_SETTER_PAIR))
 
+// Iterates through the name/setter pairs and sets the option value appropriately
 int option_store_set_option(CONCRETE_IO_HANDLE xio, const char* name, const void* value, CONCRETE_IO_HANDLE downstream_xio,
     OPTION_STORE_NAME_AND_SETTER_PAIR* pairs, size_t pair_count);
+
+// TODO: Remove this function when optionhandler goes away
+OPTIONHANDLER_HANDLE option_store_get_empty_option_handler();
 
 #ifdef __cplusplus
 }
