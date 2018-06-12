@@ -17,8 +17,6 @@
 		</dependencies>
 	</metadata>
 	<files>
-		<file src="Microsoft.Azure.C.SharedUtility_thirdpartynotice.txt" target="thirdpartynotice.txt"/>
-
 		<!-- these are files for x86 plaform -->
 		<file src="..\..\..\cmake\shared-util_output\win32\debug\aziotsharedutil.lib" target="build\native\Win32\Debug"/>
 		<file src="..\..\..\cmake\shared-util_output\win32\debug\aziotsharedutil.pdb" target="build\native\Win32\Debug"/>
